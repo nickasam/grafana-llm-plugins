@@ -1,0 +1,282 @@
+import React, { useReducer, useRef, useCallback, useEffect } from 'react';
+import { PanelProps, GrafanaTheme2, renderMarkdown } from '@grafana/data';
+import { Button, TextArea, useStyles2, Spinner } from '@grafana/ui';
+import { css, cx } from '@emotion/css';
+import { HermesPanelOptions, Message } from './types';
+
+interface State {
+  messages: Message[];
+  input: string;
+  streaming: boolean;
+  error: string | null;
+}
+
+type Action =
+  | { type: 'setInput'; value: string }
+  | { type: 'send' }
+  | { type: 'appendDelta'; value: string }
+  | { type: 'done' }
+  | { type: 'error'; value: string }
+  | { type: 'reset' };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'setInput':
+      return { ...state, input: action.value };
+    case 'send':
+      return {
+        ...state,
+        messages: [
+          ...state.messages,
+          { role: 'user', content: state.input.trim() },
+          { role: 'assistant', content: '' },
+        ],
+        input: '',
+        streaming: true,
+        error: null,
+      };
+    case 'appendDelta': {
+      const messages = state.messages.slice();
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'assistant') {
+        messages[messages.length - 1] = {
+          ...last,
+          content: last.content + action.value,
+        };
+      }
+      return { ...state, messages };
+    }
+    case 'done':
+      return { ...state, streaming: false };
+    case 'error':
+      return { ...state, streaming: false, error: action.value };
+    case 'reset':
+      return { messages: [], input: '', streaming: false, error: null };
+    default:
+      return state;
+  }
+}
+
+const initialState: State = {
+  messages: [],
+  input: '',
+  streaming: false,
+  error: null,
+};
+
+export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, width, height }) => {
+  const styles = useStyles2(getStyles);
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const abortRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const appId = options.appId || 'easyalgo-hermeschat-app';
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [state.messages]);
+
+  const send = useCallback(async () => {
+    const current = stateRef.current;
+    const text = current.input.trim();
+    if (!text || current.streaming) {
+      return;
+    }
+
+    const outgoing: Message[] = [...current.messages, { role: 'user', content: text }];
+    dispatch({ type: 'send' });
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const resp = await fetch(`/api/plugins/${appId}/resources/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ messages: outgoing, systemPrompt: options.systemPrompt || undefined }),
+        signal: controller.signal,
+      });
+
+      if (!resp.ok || !resp.body) {
+        let msg = `request failed (${resp.status})`;
+        try {
+          const j = await resp.json();
+          if (j && j.error) {
+            msg = j.error;
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+        dispatch({ type: 'error', value: msg });
+        return;
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        const chunk = decoder.decode(value, { stream: true });
+        if (chunk) {
+          dispatch({ type: 'appendDelta', value: chunk });
+        }
+      }
+      dispatch({ type: 'done' });
+    } catch (err: any) {
+      if (err && err.name === 'AbortError') {
+        dispatch({ type: 'done' });
+      } else {
+        dispatch({ type: 'error', value: err?.message || 'stream error' });
+      }
+    } finally {
+      abortRef.current = null;
+    }
+  }, [appId, options.systemPrompt]);
+
+  const stop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+  }, []);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
+  return (
+    <div className={styles.panel} style={{ width, height }}>
+      <div className={styles.messages} ref={scrollRef}>
+        {state.messages.length === 0 && <div className={styles.empty}>Ask hermes anything to get started.</div>}
+        {state.messages.map((m, i) => (
+          <div key={i} className={cx(styles.bubbleRow, m.role === 'user' ? styles.rowUser : styles.rowAssistant)}>
+            <div className={cx(styles.bubble, m.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant)}>
+              {m.role === 'assistant' ? (
+                <div
+                  className={styles.markdown}
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdown(m.content || ''),
+                  }}
+                />
+              ) : (
+                <div className={styles.userText}>{m.content}</div>
+              )}
+              {m.role === 'assistant' && state.streaming && i === state.messages.length - 1 && (
+                <span className={styles.cursor}>
+                  <Spinner inline size={12} />
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {state.error && <div className={styles.error}>{state.error}</div>}
+
+      <div className={styles.inputBar}>
+        <TextArea
+          value={state.input}
+          placeholder={options.placeholder}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+            dispatch({ type: 'setInput', value: e.target.value })
+          }
+          onKeyDown={onKeyDown}
+          rows={2}
+        />
+        {state.streaming ? (
+          <Button variant="destructive" icon="square-shape" onClick={stop}>
+            Stop
+          </Button>
+        ) : (
+          <Button icon="message" onClick={send} disabled={!state.input.trim()}>
+            Send
+          </Button>
+        )}
+        <Button variant="secondary" icon="trash-alt" onClick={() => dispatch({ type: 'reset' })} title="New chat" />
+      </div>
+    </div>
+  );
+};
+
+const getStyles = (theme: GrafanaTheme2) => ({
+  panel: css`
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `,
+  messages: css`
+    flex: 1;
+    overflow-y: auto;
+    padding: ${theme.spacing(1)};
+  `,
+  empty: css`
+    color: ${theme.colors.text.secondary};
+    text-align: center;
+    margin-top: ${theme.spacing(4)};
+  `,
+  bubbleRow: css`
+    display: flex;
+    margin-bottom: ${theme.spacing(1.5)};
+  `,
+  rowUser: css`
+    justify-content: flex-end;
+  `,
+  rowAssistant: css`
+    justify-content: flex-start;
+  `,
+  bubble: css`
+    max-width: 80%;
+    padding: ${theme.spacing(1, 1.5)};
+    border-radius: ${theme.shape.borderRadius(2)};
+    word-break: break-word;
+  `,
+  bubbleUser: css`
+    background: ${theme.colors.primary.main};
+    color: ${theme.colors.primary.contrastText};
+  `,
+  bubbleAssistant: css`
+    background: ${theme.colors.background.secondary};
+    border: 1px solid ${theme.colors.border.weak};
+  `,
+  userText: css`
+    white-space: pre-wrap;
+  `,
+  markdown: css`
+    p:last-child {
+      margin-bottom: 0;
+    }
+    pre {
+      background: ${theme.colors.background.primary};
+      padding: ${theme.spacing(1)};
+      border-radius: ${theme.shape.borderRadius(1)};
+      overflow-x: auto;
+    }
+    code {
+      font-family: ${theme.typography.fontFamilyMonospace};
+    }
+  `,
+  cursor: css`
+    margin-left: ${theme.spacing(0.5)};
+  `,
+  error: css`
+    color: ${theme.colors.error.text};
+    padding: ${theme.spacing(0, 1)};
+  `,
+  inputBar: css`
+    display: flex;
+    align-items: flex-end;
+    gap: ${theme.spacing(1)};
+    padding: ${theme.spacing(1)};
+    border-top: 1px solid ${theme.colors.border.weak};
+  `,
+});

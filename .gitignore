@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# test coverage
+coverage/
+
+# local tooling
+.joycode/
+
+# OS junk
+.DS_Store
+._*
+
+# logs
+*.log
+npm-debug.log*
+
+# symlinked node_modules
+panel/node_modules

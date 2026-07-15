@@ -1,0 +1,36 @@
+{
+  "type": "app",
+  "name": "Hermes Chat",
+  "id": "easyalgo-hermeschat-app",
+  "info": {
+    "description": "Conversational assistant backed by hermes-agent with streaming responses.",
+    "author": {
+      "name": "EasyAlgo"
+    },
+    "keywords": ["chat", "hermes", "assistant"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "screenshots": [],
+    "version": "1.0.0",
+    "updated": "2026-07-16"
+  },
+  "includes": [
+    {
+      "type": "page",
+      "name": "Chat",
+      "path": "/a/easyalgo-hermeschat-app",
+      "role": "Viewer",
+      "addToNav": true,
+      "defaultNav": true
+    }
+  ],
+  "backend": true,
+  "executable": "gpx_hermeschat",
+  "dependencies": {
+    "grafanaDependency": ">=8.5.0",
+    "grafanaVersion": "8.5.x",
+    "plugins": []
+  }
+}

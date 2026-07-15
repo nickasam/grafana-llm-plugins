@@ -1,0 +1,24 @@
+{
+  "type": "panel",
+  "name": "Hermes Chat",
+  "id": "easyalgo-hermeschat-panel",
+  "info": {
+    "description": "Streaming chat panel backed by the Hermes Chat app plugin backend.",
+    "author": {
+      "name": "EasyAlgo"
+    },
+    "keywords": ["chat", "hermes", "assistant"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "screenshots": [],
+    "version": "1.0.0",
+    "updated": "2026-07-16"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=8.5.0",
+    "grafanaVersion": "8.5.x",
+    "plugins": []
+  }
+}
