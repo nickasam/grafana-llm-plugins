@@ -1,5 +1,6 @@
 import React, { useReducer, useRef, useCallback, useEffect } from 'react';
 import { GrafanaTheme2, renderMarkdown } from '@grafana/data';
+import { config } from '@grafana/runtime';
 import { Button, TextArea, useStyles2, Icon, Spinner } from '@grafana/ui';
 import { css, cx } from '@emotion/css';
 import { Message } from '../types';
@@ -68,6 +69,13 @@ const initialState: State = {
   error: null,
 };
 
+// Prefix API paths with Grafana's appSubUrl so requests work when Grafana is
+// mounted under a subpath (e.g. /grafana behind an Ingress).
+function apiUrl(path: string): string {
+  const base = (config.appSubUrl || '').replace(/\/$/, '');
+  return `${base}${path.startsWith('/') ? path : '/' + path}`;
+}
+
 export const ChatPage: React.FC<Props> = ({ pluginId }) => {
   const styles = useStyles2(getStyles);
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -97,7 +105,7 @@ export const ChatPage: React.FC<Props> = ({ pluginId }) => {
     abortRef.current = controller;
 
     try {
-      const resp = await fetch(`/api/plugins/${pluginId}/resources/chat`, {
+      const resp = await fetch(apiUrl(`/api/plugins/${pluginId}/resources/chat`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

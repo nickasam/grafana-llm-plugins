@@ -1,5 +1,6 @@
 import React, { useReducer, useRef, useCallback, useEffect, useMemo } from 'react';
 import { PanelProps, GrafanaTheme2, DataFrame, Field, LoadingState, renderMarkdown } from '@grafana/data';
+import { config } from '@grafana/runtime';
 import { Button, TextArea, useStyles2, Spinner } from '@grafana/ui';
 import { css, cx } from '@emotion/css';
 import { HermesPanelOptions, Message } from './types';
@@ -138,6 +139,13 @@ function hashRows(rows: Row[]): string {
   return `${rows.length}:${s.length}:${h}`;
 }
 
+// Prefix API paths with Grafana's appSubUrl so requests work when Grafana is
+// mounted under a subpath (e.g. /grafana behind an Ingress).
+function apiUrl(path: string): string {
+  const base = (config.appSubUrl || '').replace(/\/$/, '');
+  return `${base}${path.startsWith('/') ? path : '/' + path}`;
+}
+
 export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, data, width, height }) => {
   const styles = useStyles2(getStyles);
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -177,7 +185,7 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, d
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const resp = await fetch(`/api/plugins/${appId}/resources/chat`, {
+        const resp = await fetch(apiUrl(`/api/plugins/${appId}/resources/chat`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
