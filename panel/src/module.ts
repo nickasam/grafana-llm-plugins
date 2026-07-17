@@ -25,6 +25,12 @@ export const plugin = new PanelPlugin<HermesPanelOptions>(ChatPanel).setPanelOpt
       name: 'Input placeholder',
       defaultValue: 'Type a message. Enter to send, Shift+Enter for newline.',
     })
+    .addBooleanSwitch({
+      path: 'autoSummary',
+      name: 'Auto-summary on first load',
+      description: '首次拿到查询结果时，自动向 Hermes 发送一次结构化摘要请求。',
+      defaultValue: true,
+    })
     .addNumberInput({
       path: 'maxRows',
       name: 'Max rows in prompt',

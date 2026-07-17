@@ -146,9 +146,58 @@ function apiUrl(path: string): string {
   return `${base}${path.startsWith('/') ? path : '/' + path}`;
 }
 
-export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, data, width, height }) => {
+// Persist the conversation across remounts (row collapse/expand, panel resize,
+// dashboard tab switch). Scoped to (dashboard, panel) within the current tab.
+function messagesKey(dashUid: string, panelId: number | string): string {
+  return `hermeschat:messages:${dashUid}:${panelId}`;
+}
+
+function readMessages(key: string): Message[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMessages(key: string, messages: Message[]): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(messages));
+  } catch {
+    // storage full or disabled — drop silently.
+  }
+}
+
+function clearMessages(key: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, options, data, width, height }) => {
   const styles = useStyles2(getStyles);
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const dashUid = (data?.request as any)?.dashboardUID || 'nodash';
+  const msgKey = useMemo(() => messagesKey(dashUid, id), [dashUid, id]);
+  const [state, dispatch] = useReducer(reducer, undefined, () => ({
+    ...initialState,
+    messages: readMessages(messagesKey(dashUid, id)),
+  }));
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const stateRef = useRef(state);
@@ -157,6 +206,7 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, d
 
   const appId = options.appId || 'easyalgo-hermeschat-app';
   const maxRows = options.maxRows && options.maxRows > 0 ? options.maxRows : 20;
+  const autoSummaryEnabled = options.autoSummary !== false;
   const autoSummaryPrompt =
     options.autoSummaryPrompt || '请基于以上 ES 数据，给出结构化摘要（任务/时间线/根本原因/影响范围/建议），结论优先。';
 
@@ -172,6 +222,19 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, d
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [state.messages]);
+
+  // Persist messages after each stream settles so a remount (row collapse/expand,
+  // panel resize) can restore them. Skip while streaming to avoid thrashing storage.
+  useEffect(() => {
+    if (state.streaming) {
+      return;
+    }
+    if (state.messages.length === 0) {
+      clearMessages(msgKey);
+    } else {
+      writeMessages(msgKey, state.messages);
+    }
+  }, [state.messages, state.streaming, msgKey]);
 
   // When the user hits "New chat" we clear the fired hash so the next data tick can auto-summarize again.
   useEffect(() => {
@@ -247,6 +310,9 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, d
 
   // Auto-fire a summary request whenever a fresh non-empty dataset lands and the chat is untouched.
   useEffect(() => {
+    if (!autoSummaryEnabled) {
+      return;
+    }
     if (!done) {
       return;
     }
@@ -264,7 +330,7 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ options, d
     const outgoing: Message[] = [{ role: 'user', content: userContent }];
     dispatch({ type: 'send', userContent });
     runStream(outgoing);
-  }, [done, rows, rowsHash, state.messages.length, state.streaming, autoSummaryPrompt, runStream]);
+  }, [autoSummaryEnabled, done, rows, rowsHash, state.messages.length, state.streaming, autoSummaryPrompt, runStream]);
 
   const stop = useCallback(() => {
     if (abortRef.current) {

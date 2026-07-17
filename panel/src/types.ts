@@ -2,6 +2,7 @@ export interface HermesPanelOptions {
   appId: string;
   systemPrompt: string;
   placeholder: string;
+  autoSummary: boolean;
   autoSummaryPrompt: string;
   maxRows: number;
 }
