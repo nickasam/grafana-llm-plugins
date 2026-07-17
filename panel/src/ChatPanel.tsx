@@ -448,9 +448,11 @@ const getStyles = (theme: GrafanaTheme2) => ({
   `,
   bubble: css`
     max-width: 80%;
+    min-width: 0;
     padding: ${theme.spacing(1, 1.5)};
     border-radius: ${theme.shape.borderRadius(2)};
     word-break: break-word;
+    overflow-wrap: anywhere;
   `,
   bubbleUser: css`
     background: ${theme.colors.primary.main};
@@ -464,17 +466,83 @@ const getStyles = (theme: GrafanaTheme2) => ({
     white-space: pre-wrap;
   `,
   markdown: css`
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    font-size: ${theme.typography.body.fontSize};
+    line-height: ${theme.typography.body.lineHeight};
+    p {
+      margin: 0 0 ${theme.spacing(0.75)} 0;
+    }
     p:last-child {
       margin-bottom: 0;
+    }
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin: ${theme.spacing(1)} 0 ${theme.spacing(0.5)} 0;
+      line-height: 1.3;
+      font-weight: 600;
+    }
+    h1 {
+      font-size: ${theme.typography.h5.fontSize};
+    }
+    h2 {
+      font-size: ${theme.typography.h6.fontSize};
+    }
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-size: ${theme.typography.body.fontSize};
+    }
+    ul,
+    ol {
+      padding-left: ${theme.spacing(2.5)};
+      margin: 0 0 ${theme.spacing(0.75)} 0;
+    }
+    li {
+      overflow-wrap: anywhere;
     }
     pre {
       background: ${theme.colors.background.primary};
       padding: ${theme.spacing(1)};
       border-radius: ${theme.shape.borderRadius(1)};
       overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
     code {
       font-family: ${theme.typography.fontFamilyMonospace};
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      border-collapse: collapse;
+      margin: ${theme.spacing(0.5)} 0 ${theme.spacing(1)} 0;
+    }
+    th,
+    td {
+      border: 1px solid ${theme.colors.border.weak};
+      padding: ${theme.spacing(0.5, 1)};
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: ${theme.colors.background.primary};
+      font-weight: 600;
+    }
+    blockquote {
+      margin: ${theme.spacing(0.5)} 0;
+      padding-left: ${theme.spacing(1)};
+      border-left: 3px solid ${theme.colors.border.medium};
+      color: ${theme.colors.text.secondary};
     }
   `,
   cursor: css`
