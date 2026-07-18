@@ -1,26 +1,19 @@
-# Hermes Chat
+# Hermes Chat for Grafana 8.5
 
-A Grafana 8.5 app plugin that provides a streaming conversational interface backed by hermes-agent (OpenAI-compatible `/v1/chat/completions` + SSE).
+Grafana **8.5.27** 双插件：
+- **App**（`easyalgo-hermeschat-app`）— Go 后端代理 LLM 服务，隐藏 token、逐块流式转发；自带整页对话界面。
+- **Panel**（`easyalgo-hermeschat-panel`）— dashboard 面板：拿到 query 结果后**自动带上下文找 LLM 做一次结构化解读**，用户可继续追问。
 
-## Features
+**接口协议**：**OpenAI 兼容 chat completions（SSE）** —— `POST /v1/chat/completions`，请求体 `{model, stream:true, messages:[...]}`，响应逐行 `data:` SSE。任何遵循此协议的模型服务都能接入（本项目实际对接 hermes-agent）。
 
-- Full-page chat UI with multi-turn context maintained on the frontend.
-- Go backend proxies requests to hermes-agent, hiding the API token and streaming SSE deltas back to the browser chunk by chunk.
-- Admin settings page for hermes URL, model, bearer token (encrypted), and an optional system prompt.
+## 功能
 
-## Configuration
+- App / Panel 都流式打字，`response.body.getReader()` 逐块渲染 Markdown。
+- Panel 首屏自动解读：`data.state=Done` 且非空 → 序列化前 N 行 + `autoSummaryPrompt` → 一次请求；行内容 djb2 hash 去重，定时刷新不重复烧 token。
+- 追问：全量 `messages[]` 续聊，首轮上下文自然带上。
+- 空数据显示占位文案，不发请求。
+- 兼容 Grafana 反向代理子路径部署（`config.appSubUrl`）。
 
-Open the plugin **Settings** page (Admin) and set:
+## 使用
 
-- **Hermes URL** — e.g. `http://hermes.easyalgo.jd.com:8643/v1/chat/completions`
-- **Model** — defaults to `hermes-agent`
-- **API token** — bearer token, stored encrypted in `secureJsonData`
-- **System prompt** — optional prefix injected as the first message on every request
-
-## Development
-
-```
-npm install
-NODE_OPTIONS=--openssl-legacy-provider npx grafana-toolkit plugin:build
-GOOS=linux GOARCH=amd64 go build -o dist/gpx_hermeschat_linux_amd64 ./pkg
-```
+安装 → 启用 App 插件 → 在 Settings 里填 Hermes URL / model / token。详见 [INSTALL.md](./INSTALL.md)。
