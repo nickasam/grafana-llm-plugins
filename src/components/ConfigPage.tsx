@@ -66,7 +66,7 @@ export const ConfigPage: React.FC<Props> = ({ plugin }) => {
         <Input
           width={70}
           value={url}
-          placeholder="http://hermes.easyalgo.jd.com:8643/v1/chat/completions"
+          placeholder="http://hermes.example.com:8643/v1/chat/completions"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)}
         />
       </Field>

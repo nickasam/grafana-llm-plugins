@@ -8,7 +8,7 @@ import (
 
 // hermesConfig holds the settings needed to talk to hermes-agent.
 type hermesConfig struct {
-	URL          string // e.g. http://hermes.easyalgo.jd.com:8643/v1/chat/completions
+	URL          string // e.g. http://hermes.example.com:8643/v1/chat/completions
 	Model        string // e.g. hermes-agent
 	SystemPrompt string // optional platform prefix injected as first message
 	Token        string // Bearer token, from secureJsonData (never logged)
