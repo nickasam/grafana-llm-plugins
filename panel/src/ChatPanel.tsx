@@ -357,7 +357,14 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, option
       return <div className={cx(styles.empty, styles.errorInline)}>查询错误：{queryError}</div>;
     }
     if (done && rows.length === 0) {
-      return <div className={styles.empty}>当前 query 没有查询到结果。</div>;
+      return (
+        <div className={styles.empty}>
+          当前时间范围内没有匹配的数据。
+          <br />
+          <br />
+          你可以直接向我提问。
+        </div>
+      );
     }
     return <div className={styles.empty}>等待数据…</div>;
   })();
