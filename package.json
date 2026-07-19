@@ -1,6 +1,6 @@
 {
   "name": "easyalgo-hermeschat-app",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Hermes Chat app plugin for Grafana 8.5",
   "scripts": {
     "build": "grafana-toolkit plugin:build --coverage=false",
