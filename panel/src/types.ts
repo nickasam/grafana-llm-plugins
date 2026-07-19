@@ -5,6 +5,8 @@ export interface HermesPanelOptions {
   autoSummary: boolean;
   autoSummaryPrompt: string;
   maxRows: number;
+  maxTurns: number;
+  limitMessage: string;
 }
 
 export type Role = 'user' | 'assistant';

@@ -206,9 +206,13 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, option
 
   const appId = options.appId || 'easyalgo-hermeschat-app';
   const maxRows = options.maxRows && options.maxRows > 0 ? options.maxRows : 20;
+  const maxTurns = typeof options.maxTurns === 'number' ? options.maxTurns : -1;
   const autoSummaryEnabled = options.autoSummary !== false;
   const autoSummaryPrompt =
     options.autoSummaryPrompt || '请基于以上 ES 数据，给出结构化摘要（任务/时间线/根本原因/影响范围/建议），结论优先。';
+
+  const userTurns = state.messages.filter((m) => m.role === 'user').length;
+  const limitReached = maxTurns >= 0 && userTurns >= maxTurns;
 
   const series = useMemo(() => data?.series ?? [], [data]);
   const rows = useMemo(() => seriesToRows(series, maxRows), [series, maxRows]);
@@ -303,10 +307,13 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, option
     if (!text || current.streaming) {
       return;
     }
+    if (limitReached) {
+      return;
+    }
     const outgoing: Message[] = [...current.messages, { role: 'user', content: text }];
     dispatch({ type: 'send', userContent: text });
     await runStream(outgoing);
-  }, [runStream]);
+  }, [runStream, limitReached]);
 
   // Auto-fire a summary request whenever a fresh non-empty dataset lands and the chat is untouched.
   useEffect(() => {
@@ -325,12 +332,25 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, option
     if (autoFiredHashRef.current === rowsHash) {
       return;
     }
+    if (limitReached) {
+      return;
+    }
     autoFiredHashRef.current = rowsHash;
     const userContent = `${autoSummaryPrompt}\n\n以下是查询结果：\n${serializeRows(rows)}`;
     const outgoing: Message[] = [{ role: 'user', content: userContent }];
     dispatch({ type: 'send', userContent });
     runStream(outgoing);
-  }, [autoSummaryEnabled, done, rows, rowsHash, state.messages.length, state.streaming, autoSummaryPrompt, runStream]);
+  }, [
+    autoSummaryEnabled,
+    done,
+    rows,
+    rowsHash,
+    state.messages.length,
+    state.streaming,
+    autoSummaryPrompt,
+    runStream,
+    limitReached,
+  ]);
 
   const stop = useCallback(() => {
     if (abortRef.current) {
@@ -398,6 +418,15 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, option
 
       {state.error && <div className={styles.error}>{state.error}</div>}
 
+      {limitReached && (
+        <div className={styles.limitBanner}>
+          {(options.limitMessage || '已达到本次会话轮数上限（{max} 轮），点击 New chat 开启新会话。').replace(
+            '{max}',
+            String(maxTurns)
+          )}
+        </div>
+      )}
+
       <div className={styles.inputBar}>
         <TextArea
           value={state.input}
@@ -407,13 +436,14 @@ export const ChatPanel: React.FC<PanelProps<HermesPanelOptions>> = ({ id, option
           }
           onKeyDown={onKeyDown}
           rows={2}
+          disabled={limitReached}
         />
         {state.streaming ? (
           <Button variant="destructive" icon="square-shape" onClick={stop}>
             Stop
           </Button>
         ) : (
-          <Button icon="message" onClick={send} disabled={!state.input.trim()}>
+          <Button icon="message" onClick={send} disabled={!state.input.trim() || limitReached}>
             Send
           </Button>
         )}
@@ -558,6 +588,14 @@ const getStyles = (theme: GrafanaTheme2) => ({
   error: css`
     color: ${theme.colors.error.text};
     padding: ${theme.spacing(0, 1)};
+  `,
+  limitBanner: css`
+    margin: ${theme.spacing(0, 1)};
+    padding: ${theme.spacing(0.75, 1)};
+    border-radius: ${theme.shape.borderRadius(1)};
+    background: ${theme.colors.warning.transparent};
+    color: ${theme.colors.warning.text};
+    font-size: ${theme.typography.bodySmall.fontSize};
   `,
   inputBar: css`
     display: flex;
