@@ -17,3 +17,25 @@ Grafana **8.5.27** 双插件：
 ## 使用
 
 安装 → 启用 App 插件 → 在 Settings 里填 Hermes URL / model / token。详见 [INSTALL.md](./INSTALL.md)。
+
+## 编译构建
+
+前置：Node.js（实测 v24/v25 可用）、Go 1.21+。
+
+```bash
+# --- App（前端 + Go 后端）---
+npm install
+NODE_OPTIONS=--openssl-legacy-provider npx grafana-toolkit plugin:build      # 前端 → dist/module.js
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/gpx_hermeschat_linux_amd64 ./pkg
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o dist/gpx_hermeschat_linux_arm64 ./pkg
+
+# --- Panel（纯前端）---
+cd panel
+npm install
+NODE_OPTIONS=--openssl-legacy-provider npx grafana-toolkit plugin:build      # → panel/dist/module.js
+```
+
+- `--openssl-legacy-provider`：新版 Node 跑旧版 webpack 所需（否则 `ERR_OSSL_EVP_UNSUPPORTED`）。
+- `CGO_ENABLED=0`：静态二进制，兼容 alpine grafana 镜像。
+
+完整从源码构建流程、常见问题见 [INSTALL.md](./INSTALL.md#附录从源码构建)。
